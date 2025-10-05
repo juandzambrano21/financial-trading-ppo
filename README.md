@@ -16,11 +16,10 @@ A implementation of the FSRPPO trading strategy. **validated with real Yahoo Fin
 - **Hurst Exponent**: Modified rescaled range analysis for market regime detection
 - **FSR**: Integrated Financial Signal Representation pipeline
 
-### State-of-the-Art RL Implementation
+### RL Implementation
 - **PPO**: Proximal Policy Optimization with advanced features
 - **Actor-Critic Architecture**: Separate policy and value networks
 - **GAE**: Generalized Advantage Estimation
-- **Adaptive Learning**: Dynamic hyperparameter adjustment
 
 ### Real Market Integration
 - **Yahoo Finance**: Automatic data fetching and preprocessing
