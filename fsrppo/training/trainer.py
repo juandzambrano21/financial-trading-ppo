@@ -220,7 +220,7 @@ class FSRPPOTrainer:
             lr=agent_config.get('lr', 1e-5),
             gamma=agent_config.get('gamma', 0.99),
             gae_lambda=agent_config.get('gae_lambda', 1.0),
-            clip_epsilon=agent_config.get('clip_range', 0.2),
+            clip_epsilon=agent_config.get('clip_epsilon', 0.2),
             entropy_coef=agent_config.get('entropy_coef', 0.01),
             value_coef=agent_config.get('value_coef', 0.5),
             max_grad_norm=agent_config.get('max_grad_norm', 0.5),
@@ -350,8 +350,19 @@ class FSRPPOTrainer:
                         log_prob=log_probs[i]
                     )
                 
+                # Debug: Log buffer size and batch size
+                buffer_size = len(self.agent.buffer)
+                batch_size = self.agent.batch_size
+                self.logger.debug(f"Episode {episode}: Buffer size={buffer_size}, Batch size={batch_size}, Episode steps={len(states)}")
+                
                 # Update the agent
                 training_stats = self.agent.update()
+                
+                # Debug: Log if update actually happened
+                if not training_stats:
+                    self.logger.debug(f"Episode {episode}: Agent update returned empty - insufficient buffer data")
+                else:
+                    self.logger.debug(f"Episode {episode}: Agent update successful - {list(training_stats.keys())}")
             else:
                 training_stats = {}
             

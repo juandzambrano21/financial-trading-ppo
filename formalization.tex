@@ -1,0 +1,616 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{fixltx2e}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[version=4]{mhchem}
+\usepackage{stmaryrd}
+\usepackage{bbold}
+\usepackage{ulem}
+
+\title{1. FSR (Financial State Representation)}
+
+\author{}
+\date{}
+
+
+\DeclareUnicodeCharacter{2264}{\ifmmode\leq\else{$\leq$}\fi}
+\DeclareUnicodeCharacter{2248}{\ifmmode\approx\else{$\approx$}\fi}
+\DeclareUnicodeCharacter{2192}{\ifmmode\rightarrow\else{$\rightarrow$}\fi}
+\DeclareUnicodeCharacter{00D7}{\ifmmode\times\else{$\times$}\fi}
+\DeclareUnicodeCharacter{2194}{\ifmmode\leftrightarrow\else{$\leftrightarrow$}\fi}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Definition of the Financial Signal and Objective}
+Let
+\[
+x(t): [0,T] \to \mathbb{R}
+\]
+be a continuous or discrete \textbf{financial signal} (e.g., log-price, return, or index level).
+
+We seek a \textbf{filtered representation}
+\[
+\hat{x}(t) = \mathcal{F}_{\text{FSR}}[x(t)]
+\]
+that \textbf{preserves long-term memory (trend)} components and removes \textbf{short-term memory (noise)}, based on the \textit{Hurst exponent} of decomposed modes.
+
+Mathematically:
+\[
+\mathcal{F}_{\text{FSR}} = \mathcal{R}_H \circ \mathcal{D}_{\text{CEESMDAN}},
+\]
+where:
+
+\begin{itemize}
+  \item $\mathcal{D}_{\text{CEESMDAN}}$ is the \textbf{Complete Ensemble Empirical Mode Decomposition with Adaptive Noise} operator;
+  \item $\mathcal{R}_H$ is the \textbf{Hurst-based reconstruction operator} determined by memory classification.
+\end{itemize}
+
+
+
+\section{CEESMDAN Decomposition}
+
+\subsection{Ensemble Setup}
+Let $x(t)$ be the input signal.\\
+Let $J$ be the number of ensembles (typically $J = 100$), and $\xi > 0$ be the noise amplitude coefficient.\\
+For each ensemble $j \in \{1,\dots,J\}$:
+\[
+x^{(j)}(t) = x(t) + \xi \cdot n^{(j)}(t),
+\]
+where $n^{(j)}(t)$ are i.i.d. zero-mean Gaussian noise realizations.
+
+\subsection{Empirical Mode Decomposition (EEMD/ESMD Variant)}
+For each ensemble $x^{(j)}(t)$, recursively extract Intrinsic Mode Functions (IMFs) $c^{(j)}_k(t)$ such that:
+\[
+x^{(j)}(t) = \sum_{k=1}^{K^{(j)}} c^{(j)}_k(t) + r^{(j)}(t),
+\]
+where $r^{(j)}(t)$ is the final residual (trend remainder).
+
+Each IMF satisfies the standard EMD properties:
+
+\begin{enumerate}
+  \item $c^{(j)}_k(t)$ has symmetric envelopes defined by its local extrema.
+  \item The number of zero crossings and extrema differ at most by one.
+  \item The mean of upper and lower envelopes at any $t$ is approximately zero.
+\end{enumerate}
+
+The \textbf{adaptive ensemble-averaged IMFs} are then computed as:
+\[
+c_k(t) = \frac{1}{J} \sum_{j=1}^{J} c^{(j)}_k(t),
+\quad r(t) = \frac{1}{J} \sum_{j=1}^{J} r^{(j)}(t).
+\]
+
+The full CEESMDAN decomposition is therefore:
+\[
+x(t) = \sum_{k=1}^{K} c_k(t) + r(t),
+\]
+where $K$ is the number of extracted IMFs.
+
+
+
+\section{Modified Rescaled Range (MRS) and Hurst Exponent Estimation}
+
+\subsection{Rescaled Range Statistic}
+For each IMF $c_k(t)$, consider its cumulative deviation series:
+\[
+Y_k(t) = \sum_{\tau=1}^{t} [c_k(\tau) - \bar{c}_k],
+\quad \bar{c}_k = \frac{1}{N}\sum_{\tau=1}^{N} c_k(\tau).
+\]
+
+For a window length $n$, define:
+\[
+R_k(n) = \max_{1 \le \tau \le n} Y_k(\tau) - \min_{1 \le \tau \le n} Y_k(\tau),
+\]
+\[
+S_k(n) = \sqrt{\frac{1}{n}\sum_{\tau=1}^{n} (c_k(\tau) - \bar{c}_k)^2}.
+\]
+The \textbf{rescaled range statistic} is:
+\[
+\frac{R_k(n)}{S_k(n)}.
+\]
+
+\subsection{Hurst Exponent Estimation}
+Assuming power-law scaling,
+\[
+\mathbb{E}\left[\frac{R_k(n)}{S_k(n)}\right] = a_k n^{H_k},
+\]
+where $H_k$ is the \textbf{Hurst exponent} of IMF $k$.
+
+Taking logarithms:
+\[
+\log\left(\frac{R_k(n)}{S_k(n)}\right) = \log a_k + H_k \log n.
+\]
+Estimate $H_k$ via least squares regression across window scales $n \in [n_{\min}, n_{\max}]$.
+
+\subsection{Modified Rescaled Range (MRS)}
+To reduce small-sample bias, \textit{Wang \& Wang (2024)} introduce a correction factor $f(n)$:
+\[
+H_k = \arg\min_{H} \sum_{n} \Big(\log(R_k(n)/S_k(n)) - (\log a_k + H \log(n f(n)))\Big)^2.
+\]
+Typical choice:
+\[
+f(n) = \frac{n-0.5}{n}.
+\]
+
+
+
+\section{Memory Classification and Thresholding}
+Each IMF $c_k(t)$ is classified according to its estimated $H_k$:
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|c|l|}
+\hline
+Memory Type & Hurst Range & Interpretation\\
+\hline
+\textbf{Short-term (anti-persistent)} & $0 \le H_k \le H_{\text{th}}$ & High-frequency noise \\
+\hline
+\textbf{Long-term (persistent)} & $H_{\text{th}} < H_k \le 1$ & Low-frequency trend \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+Typical threshold:
+\[
+H_{\text{th}} = 0.5.
+\]
+
+Thus define:
+\[
+\mathcal{S}_{\text{short}} = \{ k : H_k \le H_{\text{th}} \},
+\quad
+\mathcal{S}_{\text{long}}  = \{ k : H_k > H_{\text{th}} \}.
+\]
+
+
+
+\section{Reconstruction Operator}
+The \textbf{filtered financial signal representation} is then reconstructed as:
+\[
+\hat{x}(t) = \sum_{k \in \mathcal{S}_{\text{long}}} c_k(t) + 
+\begin{cases}
+r(t), & H_r > H_{\text{th}},\\[4pt]
+0, & H_r \le H_{\text{th}},
+\end{cases}
+\]
+where $H_r$ is the Hurst exponent of the residual $r(t)$.
+
+All components with short-term memory are treated as \textbf{noise}:
+\[
+\eta(t) = \sum_{k \in \mathcal{S}_{\text{short}}} c_k(t) + 
+\begin{cases}
+r(t), & H_r \le H_{\text{th}},\\[4pt]
+0, & H_r > H_{\text{th}}.
+\end{cases}
+\]
+
+
+
+\section{Quantitative Metrics}
+
+\subsection{Noise Reduction and Signal-to-Noise Ratio (SNR)}
+Define sample variances:
+\[
+\sigma^2_{\hat{x}} = \mathrm{Var}[\hat{x}(t)],
+\quad
+\sigma^2_{\eta} = \mathrm{Var}[\eta(t)].
+\]
+The SNR improvement (in decibels) is:
+\[
+\Delta \mathrm{SNR}_{\text{dB}} = 10 \log_{10}\left( \frac{\sigma^2_{\hat{x}} + 10^{-12}}{\sigma^2_{\eta} + 10^{-12}} \right).
+\]
+
+\subsection{Reconstruction Consistency}
+Let
+\[
+x_{\text{rec}}(t) = \sum_{k=1}^{K} c_k(t) + r(t),
+\]
+be the full reconstruction.
+
+Compute \textbf{absolute} and \textbf{relative reconstruction errors}:
+\[
+E_{\text{abs}} = |x - x_{\text{rec}}|_2, \quad
+E_{\text{rel}} = \frac{E_{\text{abs}}}{|x|_2 + 10^{-12}}.
+\]
+
+\subsection{Correlation Preservation}
+Compute the \textbf{signal correlation}:
+\[
+\rho = \frac{\mathrm{Cov}(x, \hat{x})}{\sigma_x \sigma_{\hat{x}}}.
+\]
+
+\subsection{Noise Energy Ratio}
+Let $x_{\text{noise}}$ denote all removed IMFs. Define:
+\[
+\mathrm{NRR} = \frac{\mathrm{Var}(x_{\text{noise}})}{\mathrm{Var}(x)}.
+\]
+Then the \textbf{noise reduction (dB)} is:
+\[
+\mathrm{NRR}_{\text{dB}} = -10 \log_{10}(\mathrm{NRR} + 10^{-12}).
+\]
+
+
+
+\section{Validation Criteria}
+The reconstructed representation $\hat{x}(t)$ satisfies the following \textbf{quality constraints}:
+
+\begin{enumerate}
+  \item \textbf{Energy Preservation:}
+\[
+|x - x_{\text{rec}}|_2 < \epsilon_1 |x|_2, \quad \epsilon_1 \approx 10^{-3}.
+\]
+
+  \item \textbf{Positive Correlation with Original:}
+\[
+\rho > 0.95.
+\]
+
+  \item \textbf{Noise Reduction Criterion:}
+\[
+\mathrm{NRR}_{\text{dB}} > 10~\text{dB (minimum acceptable denoising)}.
+\]
+
+  \item \textbf{Component Balance:}
+\[
+|\mathcal{S}_{\text{long}}| + |\mathcal{S}_{\text{short}}| = K, \quad
+\frac{|\mathcal{S}_{\text{long}}|}{K} \in [0.2, 0.8],
+\]
+ensuring neither under- nor over-filtering.
+
+\end{enumerate}
+
+
+
+\section{Formal Pipeline Summary}
+\[
+\boxed{
+\begin{aligned}
+\textbf{Input:} &\quad x(t), \text{ CEESMDAN parameters } \Theta_{\text{E}}, \text{ Hurst params } \Theta_{\text{H}}, \text{ threshold } H_{\text{th}}.\\[4pt]
+\textbf{Step 1 (Decomposition):}&\quad \{c_k(t)\}_{k=1}^K, r(t) = \mathcal{D}_{\text{CEESMDAN}}(x(t);\Theta_{\text{E}}).\\[4pt]
+\textbf{Step 2 (Memory Analysis):}&\quad H_k = \mathcal{H}_{\text{MRS}}(c_k(t);\Theta_{\text{H}}),\quad H_r = \mathcal{H}_{\text{MRS}}(r(t);\Theta_{\text{H}}).\\[4pt]
+\textbf{Step 3 (Classification):}&\quad
+\begin{cases}
+c_k \in \text{trend}, & H_k > H_{\text{th}},\\
+c_k \in \text{noise}, & H_k \le H_{\text{th}}.
+\end{cases}\\[4pt]
+\textbf{Step 4 (Reconstruction):}&\quad
+\hat{x}(t) = \sum_{H_k > H_{\text{th}}} c_k(t) + \mathbb{1}_{\{H_r>H_{\text{th}}\}} r(t).\\[4pt]
+\textbf{Step 5 (Validation):}&\quad
+\text{Compute } (E_{\text{rel}}, \rho, \mathrm{NRR}_{\text{dB}}, \Delta\mathrm{SNR}_{\text{dB}}).
+\end{aligned}
+}
+\]
+
+
+
+\section{Theoretical Interpretation}
+Let $\{c_k\}$ form a complete adaptive basis of $L^2([0,T])$.\\
+The projection onto the "trend" subspace defined by $H_k > H_{\text{th}}$ is:
+\[
+\Pi_{\text{trend}}(x) = \sum_{H_k>H_{\text{th}}} \langle x, c_k \rangle c_k.
+\]
+Then FSR acts as a \textbf{memory-aware projection operator}:
+\[
+\boxed{
+\mathcal{F}_{\text{FSR}} = \Pi_{\text{trend}} \circ \mathcal{D}_{\text{CEESMDAN}},
+}
+\]
+yielding:
+\[
+\hat{x}(t) = \mathcal{F}_{\text{FSR}}[x(t)] = \Pi_{\text{trend}}\Big(\mathcal{D}_{\text{CEESMDAN}}(x(t))\Big).
+\]
+
+This operator is \textbf{idempotent} over long-memory components:
+\[
+\mathcal{F}_{\text{FSR}}(\hat{x}) = \hat{x},
+\]
+and \textbf{contractive} in energy norm over noise:
+\[
+|\mathcal{F}_{\text{FSR}}(x)|_2 \le |x|_2.
+\]
+
+
+
+\section{Summary of Parameters}
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|c|}
+\hline
+Symbol & Description & Default\\
+\hline
+$J$ & Number of ensemble realizations & 100 \\
+\hline
+$\xi$ & Noise coefficient & 0.005 \\
+\hline
+$\varpi', \varpi$ & Extrema thresholds (ESMD) & 6 \\
+\hline
+$C$ & Cubic spline count & 2 \\
+\hline
+$\delta$ & Convergence threshold & 0.001 \\
+\hline
+$D$ & Maximum iterations & 100 \\
+\hline
+$H_{\text{th}}$ & Hurst threshold & 0.5 \\
+\hline
+$n_{\min}, n_{\max}$ & Window bounds for MRS & 10, adaptive \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+
+\subsection{Final Output}
+The \textbf{Financial Signal Representation} $\hat{x}(t)$ is the \textit{noise-filtered, trend-preserving component} of $x(t)$, formally derived by CEESMDAN decomposition and Hurst-based long-memory reconstruction.
+
+Mathematically,
+\[
+\boxed{
+\hat{x}(t) = \sum_{H_k > 0.5} c_k(t) + \mathbb{1}_{\{H_r > 0.5\}}r(t),
+}
+\]
+satisfying:
+\[
+\rho(x,\hat{x}) > 0.95,\quad \mathrm{NRR}_{\text{dB}} > 10,\quad E_{\text{rel}} < 10^{-3}.
+\]
+
+This forms the \textbf{input preprocessing layer} of the FSRPPO architecture — guaranteeing robust, noise-resistant financial signal representation for downstream reinforcement learning or forecasting.
+
+\section{PPO Agent}
+
+\subsection{Formal Setup}
+We work in a \textbf{finite-horizon discounted Markov decision process} (MDP) defined by
+\[
+\mathcal{M} = (\mathcal{S}, \mathcal{A}, p, r, \gamma),
+\]
+where:
+
+\begin{itemize}
+  \item $\mathcal{S} \subset \mathbb{R}^{d_s}$: continuous \textbf{state space} (e.g. trading observations),
+  \item $\mathcal{A} \subset \mathbb{R}^{d_a}$: continuous \textbf{action space} (e.g. position weights),
+  \item $p(s'|s,a)$: transition kernel induced by the market environment,
+  \item $r(s,a)\in\mathbb{R}$: reward function (as defined by trading environment),
+  \item $\gamma \in (0,1)$: discount factor.
+\end{itemize}
+
+At discrete times $t = 0, 1, \dots, T$, the agent observes $s_t \in \mathcal{S}$, chooses $a_t \in \mathcal{A}$, receives $r_t = r(s_t, a_t)$, and transitions to $s_{t+1} \sim p(\cdot|s_t, a_t)$.
+
+The goal of the PPO agent is to learn a stochastic policy $\pi_{\theta}(a|s)$ parameterized by $\theta \in \mathbb{R}^{d_\theta}$, maximizing the expected discounted return:
+\[
+J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \sum_{t=0}^{T} \gamma^t r_t \right].
+\]
+
+
+\subsection{Actor–Critic Architecture}
+The agent maintains two differentiable parameterized functions:
+
+\begin{enumerate}
+  \item \textbf{Actor (policy network):}
+\[
+\pi_{\theta}(a|s) \equiv \text{Prob}_\theta(a|s),
+\]
+representing a stochastic policy over continuous actions (typically modeled via a Beta distribution).
+
+  \item \textbf{Critic (value network):}
+\[
+V_{\phi}(s) \approx \mathbb{E}_{\pi_\theta}\left[ \sum_{t'=t}^{T} \gamma^{t'-t} r_{t'} \mid s_t = s \right],
+\]
+parameterized by $\phi \in \mathbb{R}^{d_\phi}$.
+
+\end{enumerate}
+
+Both $\pi_\theta$ and $V_\phi$ are differentiable mappings:
+\[
+\pi_\theta : \mathcal{S} \to \Delta(\mathcal{A}), \quad
+V_\phi : \mathcal{S} \to \mathbb{R},
+\]
+where $\Delta(\mathcal{A})$ denotes the space of probability densities over $\mathcal{A}$.
+
+
+\subsection{Policy Distribution — Beta Transformation}
+The actor outputs unbounded continuous logits $u_\theta(s) \in (-1,1)^{d_a}$.\\
+Each action component is transformed as:
+
+\[
+\begin{aligned}
+a^{(j)} &\sim \text{Beta}(\alpha^{(j)}, \beta^{(j)}), \\
+\alpha^{(j)} &= 2\cdot\frac{u^{(j)}_\theta(s) + 1}{2} + 1 = u^{(j)}_\theta(s) + 2, \\
+\beta^{(j)}  &= 2\cdot(1 - \tfrac{u^{(j)}_\theta(s)+1}{2}) + 1 = 3 - u^{(j)}_\theta(s).
+\end{aligned}
+\]
+
+After sampling $a^{(j)} \in [0,1]$, the final \textbf{re-centered action} is:
+\[
+\tilde{a}^{(j)} = 2 a^{(j)} - 1 \in [-1,1].
+\]
+Thus the stochastic policy is:
+\[
+\pi_{\theta}(a|s) = \prod_{j=1}^{d_a} \text{BetaPDF}\left( \tfrac{a^{(j)}+1}{2}; \alpha^{(j)}, \beta^{(j)}\right) \cdot 2^{-d_a}.
+\]
+Its \textbf{log-probability}:
+\[
+\log \pi_\theta(a|s) = \sum_{j=1}^{d_a} \Big[
+(\alpha^{(j)} - 1)\ln\left(\tfrac{a^{(j)}+1}{2}\right)
++ (\beta^{(j)} - 1)\ln\left(1 - \tfrac{a^{(j)}+1}{2}\right)
+- \ln B(\alpha^{(j)}, \beta^{(j)}) - \ln 2
+\Big],
+\]
+and the \textbf{entropy}:
+\[
+\mathcal{H}[\pi_\theta(\cdot|s)] = \sum_{j=1}^{d_a}
+\Big[
+\ln B(\alpha^{(j)},\beta^{(j)}) - (\alpha^{(j)}-1)\psi(\alpha^{(j)}) - (\beta^{(j)}-1)\psi(\beta^{(j)}) + (\alpha^{(j)}+\beta^{(j)}-2)\psi(\alpha^{(j)}+\beta^{(j)})
+\Big],
+\]
+where $B(\cdot,\cdot)$ is the Beta function and $\psi(\cdot)$ is the digamma function.
+
+
+\subsection{Experience Buffer and Dataset}
+The agent maintains a replay buffer $\mathcal{D}_B$ of capacity $B$, containing tuples:
+\[
+(s_t, a_t, r_t, s_{t+1}, d_t, \log\pi_{\theta_{\text{old}}}(a_t|s_t)),
+\]
+where $d_t\in\{0,1\}$ indicates episode termination.
+
+For each policy update, we sample a mini-batch $\mathcal{B} \subset \mathcal{D}_B$ of size $|\mathcal{B}| = b \le B$. The batch contains:
+\[
+\mathcal{B} = \{(s_i, a_i, r_i, s'_i, d_i, \log\pi_{\text{old}}(a_i|s_i))\}_{i=1}^{b}.
+\]
+
+
+\subsection{Generalized Advantage Estimation (GAE)}
+For each transition $(s_i, a_i, r_i, s'_i, d_i) \in \mathcal{B}$, compute the \textbf{temporal difference error}:
+\[
+\delta_i = r_i + \gamma (1 - d_i) V_\phi(s'_i) - V_\phi(s_i).
+\]
+
+The \textbf{GAE advantage} with parameter $\lambda \in [0,1]$ is:
+\[
+A_i^{\text{GAE}} = \sum_{k=0}^{\infty} (\gamma \lambda)^k \delta_{i+k},
+\]
+where we truncate the sum at episode boundaries or buffer limits.
+
+The \textbf{target value} for critic training is:
+\[
+V_i^{\text{target}} = A_i^{\text{GAE}} + V_\phi(s_i).
+\]
+
+
+\subsection{PPO Objective Functions}
+
+\subsubsection{Policy Loss (Clipped Surrogate)}
+Define the \textbf{probability ratio}:
+\[
+\rho_i(\theta) = \frac{\pi_\theta(a_i|s_i)}{\pi_{\theta_{\text{old}}}(a_i|s_i)} = \exp\left(\log\pi_\theta(a_i|s_i) - \log\pi_{\theta_{\text{old}}}(a_i|s_i)\right).
+\]
+
+The \textbf{clipped surrogate objective} is:
+\[
+L^{\text{CLIP}}(\theta) = \frac{1}{b} \sum_{i=1}^{b} \min\left( \rho_i(\theta) A_i^{\text{GAE}}, \text{clip}(\rho_i(\theta), 1-\epsilon, 1+\epsilon) A_i^{\text{GAE}} \right),
+\]
+where $\epsilon > 0$ is the clipping parameter (typically $\epsilon = 0.2$).
+
+\subsubsection{Value Loss}
+The \textbf{value function loss} is:
+\[
+L^{\text{VF}}(\phi) = \frac{1}{b} \sum_{i=1}^{b} \left( V_\phi(s_i) - V_i^{\text{target}} \right)^2.
+\]
+
+\subsubsection{Entropy Regularization}
+To encourage exploration, we add an \textbf{entropy bonus}:
+\[
+L^{\text{ENT}}(\theta) = \frac{1}{b} \sum_{i=1}^{b} \mathcal{H}[\pi_\theta(\cdot|s_i)].
+\]
+
+\subsubsection{Combined Objective}
+The \textbf{total PPO loss} is:
+\[
+L^{\text{PPO}}(\theta, \phi) = -L^{\text{CLIP}}(\theta) + c_1 L^{\text{VF}}(\phi) - c_2 L^{\text{ENT}}(\theta),
+\]
+where $c_1, c_2 > 0$ are weighting coefficients.
+
+
+\subsection{PPO Algorithm}
+
+\begin{enumerate}
+  \item \textbf{Initialize:} Policy parameters $\theta_0$, value parameters $\phi_0$, buffer $\mathcal{D}_B = \emptyset$.
+
+  \item \textbf{For} episode $e = 1, 2, \dots$:
+  \begin{enumerate}
+    \item Collect trajectory $\tau_e = \{(s_t, a_t, r_t, s_{t+1}, d_t)\}_{t=0}^{T_e}$ using $\pi_{\theta_e}$.
+    \item Store transitions in buffer: $\mathcal{D}_B \leftarrow \mathcal{D}_B \cup \tau_e$.
+    \item If $|\mathcal{D}_B| \ge b$:
+    \begin{enumerate}
+      \item Sample mini-batch $\mathcal{B}$ from $\mathcal{D}_B$.
+      \item Compute advantages $\{A_i^{\text{GAE}}\}$ and targets $\{V_i^{\text{target}}\}$.
+      \item \textbf{For} $k = 1, \dots, K$ epochs:
+      \begin{enumerate}
+        \item Update policy: $\theta \leftarrow \theta - \alpha_\pi \nabla_\theta L^{\text{PPO}}(\theta, \phi)$.
+        \item Update critic: $\phi \leftarrow \phi - \alpha_v \nabla_\phi L^{\text{PPO}}(\theta, \phi)$.
+      \end{enumerate}
+    \end{enumerate}
+  \end{enumerate}
+
+  \item \textbf{Return:} Trained policy $\pi_\theta$ and value function $V_\phi$.
+\end{enumerate}
+
+
+\subsection{Hyperparameters}
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|c|}
+\hline
+Symbol & Description & Typical Value\\
+\hline
+$\gamma$ & Discount factor & 0.99 \\
+\hline
+$\lambda$ & GAE parameter & 0.95 \\
+\hline
+$\epsilon$ & Clipping parameter & 0.2 \\
+\hline
+$c_1$ & Value loss coefficient & 0.5 \\
+\hline
+$c_2$ & Entropy coefficient & 0.01 \\
+\hline
+$\alpha_\pi$ & Policy learning rate & $3 \times 10^{-4}$ \\
+\hline
+$\alpha_v$ & Value learning rate & $1 \times 10^{-3}$ \\
+\hline
+$K$ & Update epochs per batch & 4 \\
+\hline
+$b$ & Mini-batch size & 64 \\
+\hline
+$B$ & Buffer capacity & 2048 \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+
+\subsection{Convergence Properties}
+Under standard regularity conditions, PPO with clipping satisfies:
+
+\begin{enumerate}
+  \item \textbf{Monotonic Improvement:} The clipped objective provides a lower bound on policy improvement.
+  \item \textbf{Sample Efficiency:} Multiple epochs of updates per batch improve sample utilization.
+  \item \textbf{Stability:} Clipping prevents destructively large policy updates.
+\end{enumerate}
+
+The \textbf{policy gradient theorem} ensures that:
+\[
+\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \log \pi_\theta(a|s) A^\pi(s,a) \right],
+\]
+where $A^\pi(s,a)$ is the true advantage function.
+
+PPO approximates this gradient while maintaining trust region constraints through clipping, leading to stable and efficient policy optimization.
+
+
+
+\subsection{Integration with FSR}
+The PPO agent receives \textbf{FSR-processed states} $\hat{s}_t = \text{FSR}(s_t^{\text{raw}})$ as input, where:
+
+\begin{itemize}
+  \item $s_t^{\text{raw}}$ contains raw financial time series data.
+  \item $\text{FSR}(\cdot)$ applies the Financial Signal Representation preprocessing.
+  \item $\hat{s}_t$ contains denoised, trend-preserving features for policy learning.
+\end{itemize}
+
+This integration ensures that the PPO agent learns from \textbf{robust, noise-filtered representations} of the financial environment, leading to more stable and effective trading policies.
+
+The complete \textbf{FSRPPO architecture} combines:
+\[
+\boxed{
+\text{Raw Data} \xrightarrow{\text{FSR}} \text{Filtered States} \xrightarrow{\text{PPO}} \text{Optimal Policy}
+}
+\]
+
+\end{document}

@@ -145,7 +145,6 @@ dmypy.json
 *.weights
 
 # Data files
-data/
 datasets/
 *.csv
 *.json

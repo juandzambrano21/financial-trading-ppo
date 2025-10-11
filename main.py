@@ -151,8 +151,8 @@ def main():
                 'transaction_cost': args.transaction_cost,
                 'slippage': 0.0005,
                 'max_position_size': args.max_position_size,
-                'lookback_window': 3,  # Reduced for short test periods
-                'min_periods': 10
+                'lookback_window': 10,  # Reduced for short test periods
+                'min_periods': 100
             }
         }
         

@@ -390,6 +390,7 @@ class TradingEnvironment(gym.Env):
         
         # Risk adjustment
         if len(self.daily_returns) > 10:
+            #TODO: CHANGE 10 TO AN ARBITRARY DEFINED PARAMETER
             volatility = np.std(self.daily_returns[-10:])  # Rolling volatility
             if volatility > 0:
                 risk_adjusted_return = portfolio_return / volatility
@@ -471,13 +472,17 @@ class TradingEnvironment(gym.Env):
         portfolio_weights = self.positions * np.array([
             self.data[symbol].iloc[current_idx-1]['Close'] for symbol in self.symbols
         ]) / max(self.total_value, 1)
+
         
+
         portfolio_state = np.array([
             self.cash / self.config.initial_cash,  # Normalized cash
             *portfolio_weights,  # Position weights
             self.portfolio_value / self.config.initial_cash,  # Normalized portfolio value
             self.total_value / self.config.initial_cash  # Normalized total value
         ])
+
+        logger.log(f"portfolio_state: {portfolio_state}")
         
         # Market features
         market_features = []
